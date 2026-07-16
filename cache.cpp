@@ -321,12 +321,13 @@ void initCache(unsigned int ways)
 }
 
 // Simulate one memory access. Return HIT or MISS.
+
 cacheResType cacheAccess(unsigned int addr, accessType type)
 {
 	// 1. Parse the address fields using Developer A's helper
 	ParsedAddress parsed = parseAddress(addr);
 	
-	int hit_index = -1;
+	int hit_index = g_ways; // Initialize to an invalid index (no hit)
 
 	// 2. HIT DETECTION
 	// Loop through all ways in the target set
@@ -338,7 +339,7 @@ cacheResType cacheAccess(unsigned int addr, accessType type)
 	}
 
 	// 3. ACTION ON HIT
-	if (hit_index != -1) {
+	if (hit_index != g_ways) {
 		// If it's a WRITE request, mark the line as dirty
 		if (type == WRITE) {
 			cache[parsed.set_index][hit_index].dirty = true;
@@ -348,7 +349,7 @@ cacheResType cacheAccess(unsigned int addr, accessType type)
 
 	// 4. ACTION ON MISS
 	// Look for an empty way first
-	int victim_idx = -1;
+	int victim_idx = g_ways;
 	for (unsigned int w = 0; w < g_ways; w++) {
 		if (!cache[parsed.set_index][w].valid) {
 			victim_idx = w;
@@ -357,7 +358,7 @@ cacheResType cacheAccess(unsigned int addr, accessType type)
 	}
 
 	// If the set is entirely full, pick a random victim
-	if (victim_idx == -1) {
+	if (victim_idx == g_ways) {
 		// randReplace() returns a 32-bit random integer; modulo it by g_ways
 		victim_idx = randReplace() % g_ways;
 
