@@ -34,6 +34,13 @@ struct CacheLine {
 	CacheLine() : tag(0), valid(false), dirty(false) {}
 };
 
+// Structure to return parsed address fields cleanly
+struct ParsedAddress {
+	unsigned int tag;
+	unsigned int set_index;
+	unsigned int offset;
+};
+
 // Declare the global cache container (2D grid: Rows = Sets, Columns = Ways)
 vector<vector<CacheLine>> cache;
 
@@ -56,6 +63,27 @@ unsigned int m_z = 0x05080902;    /* must not be zero, nor 0x9068ffff */
 
 unsigned int m_w_rep = 0x12345678;
 unsigned int m_z_rep = 0x9ABCDEF0;
+
+// Helper function to extract Tag, Set Index, and Offset from a 32-bit address
+ParsedAddress parseAddress(unsigned int addr)
+{
+	ParsedAddress parsed;
+
+	// 1. Offset: The lowest 6 bits (since line size is 64 Bytes, log2(64) = 6)
+	parsed.offset = addr & 0x3F;
+
+	// 2. Calculate log2(num_sets) dynamically using count trailing zeros
+	// This gives us the exact number of bits needed for the Set Index
+	unsigned int index_bits = __builtin_ctz(num_sets);
+
+	// 3. Set Index: Shift past offset (6 bits), then mask with (num_sets - 1)
+	parsed.set_index = (addr >> 6) & (num_sets - 1);
+
+	// 4. Tag: Shift past both the offset (6 bits) and the index bits
+	parsed.tag = addr >> (6 + index_bits);
+
+	return parsed;
+}
 
 unsigned int rand_()
 {
