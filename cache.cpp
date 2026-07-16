@@ -25,6 +25,21 @@ using namespace std;
 enum cacheResType {MISS=0, HIT=1};
 enum accessType   {READ=0, WRITE=1};
 
+struct CacheLine {
+	unsigned int tag;   // Stores the memory block address tag
+	bool valid;         // true if the line contains valid data
+	bool dirty;         // true if data was modified by a WRITE (for write-back policy)
+
+	// Constructor to make initialization clean and easy
+	CacheLine() : tag(0), valid(false), dirty(false) {}
+};
+
+// Declare the global cache container (2D grid: Rows = Sets, Columns = Ways)
+vector<vector<CacheLine>> cache;
+
+// Global variable to track the active number of sets
+unsigned int num_sets = 0;
+
 // One memory transaction produced by a generator
 struct MemReq {
 	unsigned int addr;
@@ -247,15 +262,34 @@ static unsigned long long g_writebacks = 0;
 // TODO: add the data structures you need for tags / valid / dirty / ...
 
 // Cold-reset (and reconfigure) the cache for the given number of ways.
+// --- Developer A: Cache Initialization ---
+
 void initCache(unsigned int ways)
 {
 	g_ways = ways;
 	g_writebacks = 0;
-	m_w_rep = 0x12345678;
+	m_w_rep = 0x12345678; // Reset replacement RNG seeds for reproducibility
 	m_z_rep = 0x9ABCDEF0;
 
-	// TODO: allocate / clear cache state for this associativity
-	(void)g_ways;
+	// 1. Calculate the active number of sets
+	// num_sets = CACHE_SIZE / (LINE_SIZE * ways)
+	num_sets = CACHE_SIZE / (LINE_SIZE * ways);
+
+	// 2. Resize and initialize the 2D cache container
+	// First dimension: num_sets (Rows)
+	cache.resize(num_sets);
+
+	for (unsigned int i = 0; i < num_sets; i++) {
+		// Second dimension: ways (Columns)
+		cache[i].resize(ways);
+
+		// 3. Reset the valid/dirty states for every way in this set
+		for (unsigned int j = 0; j < ways; j++) {
+			cache[i][j].tag = 0;
+			cache[i][j].valid = false;
+			cache[i][j].dirty = false;
+		}
+	}
 }
 
 // Simulate one memory access. Return HIT or MISS.
