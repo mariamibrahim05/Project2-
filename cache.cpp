@@ -321,12 +321,61 @@ void initCache(unsigned int ways)
 }
 
 // Simulate one memory access. Return HIT or MISS.
-// Placeholder: always HIT (ideal cache). Students must replace this.
 cacheResType cacheAccess(unsigned int addr, accessType type)
 {
-	(void)addr;
-	(void)type;
-	return HIT;
+	// 1. Parse the address fields using Developer A's helper
+	ParsedAddress parsed = parseAddress(addr);
+	
+	int hit_index = -1;
+
+	// 2. HIT DETECTION
+	// Loop through all ways in the target set
+	for (unsigned int w = 0; w < g_ways; w++) {
+		if (cache[parsed.set_index][w].valid && cache[parsed.set_index][w].tag == parsed.tag) {
+			hit_index = w;
+			break; // Found it!
+		}
+	}
+
+	// 3. ACTION ON HIT
+	if (hit_index != -1) {
+		// If it's a WRITE request, mark the line as dirty
+		if (type == WRITE) {
+			cache[parsed.set_index][hit_index].dirty = true;
+		}
+		return HIT;
+	}
+
+	// 4. ACTION ON MISS
+	// Look for an empty way first
+	int victim_idx = -1;
+	for (unsigned int w = 0; w < g_ways; w++) {
+		if (!cache[parsed.set_index][w].valid) {
+			victim_idx = w;
+			break;
+		}
+	}
+
+	// If the set is entirely full, pick a random victim
+	if (victim_idx == -1) {
+		// randReplace() returns a 32-bit random integer; modulo it by g_ways
+		victim_idx = randReplace() % g_ways;
+
+		// WRITE-BACK POLICY: Check if the victim is valid AND dirty
+		if (cache[parsed.set_index][victim_idx].valid && cache[parsed.set_index][victim_idx].dirty) {
+			g_writebacks++; // Increment our global write-back counter
+		}
+	}
+
+	// 5. WRITE-ALLOCATE POLICY: Bring the new block into the cache
+	cache[parsed.set_index][victim_idx].tag = parsed.tag;
+	cache[parsed.set_index][victim_idx].valid = true;
+	
+	// If this miss was triggered by a WRITE, the line becomes dirty immediately.
+	// If triggered by a READ, it arrives clean.
+	cache[parsed.set_index][victim_idx].dirty = (type == WRITE);
+
+	return MISS;
 }
 
 unsigned long long getWritebacks()
