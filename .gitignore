@@ -1,0 +1,9 @@
+# IDE-generated files
+.idea/
+.vs/
+
+# Local build products
+cmake-build-*/
+*.exe
+*.obj
+*.o

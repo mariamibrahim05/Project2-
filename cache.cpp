@@ -69,18 +69,11 @@ ParsedAddress parseAddress(unsigned int addr)
 {
 	ParsedAddress parsed;
 
-	// 1. Offset: The lowest 6 bits (since line size is 64 Bytes, log2(64) = 6)
-	parsed.offset = addr & 0x3F;
-
-	// 2. Calculate log2(num_sets) dynamically using count trailing zeros
-	// This gives us the exact number of bits needed for the Set Index
-	unsigned int index_bits = __builtin_ctz(num_sets);
-
-	// 3. Set Index: Shift past offset (6 bits), then mask with (num_sets - 1)
-	parsed.set_index = (addr >> 6) & (num_sets - 1);
-
-	// 4. Tag: Shift past both the offset (6 bits) and the index bits
-	parsed.tag = addr >> (6 + index_bits);
+	// Split the address arithmetically so this works on both GCC and MSVC.
+	const unsigned int block_number = addr / LINE_SIZE;
+	parsed.offset = addr % LINE_SIZE;
+	parsed.set_index = block_number % num_sets;
+	parsed.tag = block_number / num_sets;
 
 	return parsed;
 }
@@ -327,7 +320,7 @@ cacheResType cacheAccess(unsigned int addr, accessType type)
 	// 1. Parse the address fields using Developer A's helper
 	ParsedAddress parsed = parseAddress(addr);
 	
-	int hit_index = g_ways; // Initialize to an invalid index (no hit)
+	unsigned int hit_index = g_ways; // Initialize to an invalid index (no hit)
 
 	// 2. HIT DETECTION
 	// Loop through all ways in the target set
@@ -349,7 +342,7 @@ cacheResType cacheAccess(unsigned int addr, accessType type)
 
 	// 4. ACTION ON MISS
 	// Look for an empty way first
-	int victim_idx = g_ways;
+	unsigned int victim_idx = g_ways;
 	for (unsigned int w = 0; w < g_ways; w++) {
 		if (!cache[parsed.set_index][w].valid) {
 			victim_idx = w;
@@ -454,8 +447,8 @@ int main(int argc, char* argv[])
 	if (argc >= 2)
 		outPath = argv[1];
 
-	cout << "Project 2: Associativity vs Cache Hit Ratio (starter)\n";
-	cout << "NOTE: cacheAccess() is a placeholder (always HIT) until you implement it.\n";
+	cout << "Project 2: Associativity vs Cache Hit Ratio\n";
+	cout << "Set-associative cache simulator\n";
 	cout << "Cache size = " << CACHE_SIZE << " B, Line size = "
 	     << LINE_SIZE << " B, Replacement = random\n";
 	cout << "Write policy = write-back + write-allocate\n";
